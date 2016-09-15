@@ -67,9 +67,10 @@ def gen_address_for_data(data):
 
 
 
-def pushTx(tx):
+def push_tx(tx):
 	tx_id = spool._t.push(tx)
 	print("Pushed tx %s" % tx_id)
+	return tx_id
 
 
 
@@ -86,7 +87,7 @@ if __name__ == "__main__":
 	if cmd == 'fund':
 		print("Funding federation wallet %s..." % fed_wallet.root_address[1])
 		tx = fund_federation_wallet(fed_wallet, fund_wallet, FUND_WALLET_SECRET)
-		txid = pushTx(tx)
+		txid = push_tx(tx)
 		print("https://www.blocktrail.com/BTC/tx/%s" % txid)
 
 	elif cmd == 'notarise':
@@ -103,8 +104,10 @@ if __name__ == "__main__":
 
 		print('Notarising data...')
 
-		tx_hex = generate_notarise_tx(fed_wallet.root_address[1], fed_wallet_secret, data_prefixed)
-		pushTx(tx_hex)
+		tx_hex = generate_notarise_tx(fed_wallet.root_address[1], FEDERATION_WALLET_SECRET, data_prefixed)
+
+		print("Pushing %s" % tx_hex)
+		push_tx(tx_hex)
 
 	else:
 		print("Syntax: registerWorkSimple.py (fund | notarise) <data>")

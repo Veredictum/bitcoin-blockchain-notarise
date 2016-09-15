@@ -7,26 +7,11 @@ from flask import jsonify
 
 from spool import Wallet
 
-from register_work import generate_notarise_tx
+from register_work import generate_notarise_tx, push_tx
 
 
 app = Flask(__name__)
 
-
-# Temporary measure to stop outsiders from using service.
-AUTH_TOKEN = os.environ.get('AUTH_TOKEN')
-# Prefix for data inserted in OP_RETURN
-DATA_PREFIX = 'VDICT '
-
-FUND_WALLET_SECRET = os.environ.get('FUND_WALLET_SECRET')
-FEDERATION_WALLET_SECRET = os.environ.get('FED_WALLET_SECRET')
-
-if not AUTH_TOKEN or not FUND_WALLET_SECRET or not FEDERATION_WALLET_SECRET:
-	raise Exception("Bad config")
-
-
-fund_wallet = Wallet(FUND_WALLET_SECRET)
-fed_wallet = Wallet(FEDERATION_WALLET_SECRET)
 
 
 
@@ -56,26 +41,11 @@ def handle_invalid_usage(error):
     response.status_code = error.status_code
     return response
 
-@app.route('/')
-def index():
-	return "Fund wallet address %s\nFederation wallet address %s" % (fund_wallet.root_address[1], fed_wallet.root_address[1])
 
 
-# 
-# Actual API
-# 
-@app.route("/notarise", methods = ['POST'])
-def notarise():
+
+def notarise(data):
 	tx_hex = ''
-
-	# try:
-	data = request.form['data']
-	auth_token = request.form['token']
-
-	print("POST with "+data)
-
-	if(auth_token != AUTH_TOKEN):
-		raise InvalidUsage('Not authorized for token', status_code=403)
 	
 	if(len(data) < 16):
 		raise InvalidUsage('Data needs to be 16+ bytes', status_code=400)
@@ -91,13 +61,35 @@ def notarise():
 		raise InvalidUsage('Data needs to be 80 bytes or less', status_code=400)
 
 	try:
-		# tx_hex = generate_notarise_tx(fed_wallet.root_address[1], FEDERATION_WALLET_SECRET, data_prefixed)
-		tx_hex = '123'
+		tx_hex = generate_notarise_tx(fed_wallet.root_address[1], FEDERATION_WALLET_SECRET, data_prefixed)
 	except Exception as e:
 		raise e
 
-	return tx_hex
+	return push_tx(tx_hex)
 
+
+
+# 
+# Actual API
+# 
+
+@app.route('/')
+def index():
+	return "Fund wallet address %s\n Federation wallet address %s" % (fund_wallet.root_address[1], fed_wallet.root_address[1])
+
+
+@app.route("/notarise", methods = ['POST'])
+def api_notarise():
+	# try:
+	data = request.form['data']
+	auth_token = request.form['token']
+
+	print("POST with "+data)
+
+	if(auth_token != AUTH_TOKEN):
+		raise InvalidUsage('Not authorized for token', status_code=403)
+
+	return notarise(data)
 
 
 
@@ -105,6 +97,28 @@ def notarise():
 
 if __name__ == "__main__":
 	ip = sys.argv[1]
+
+
+	# Temporary measure to stop outsiders from using service.
+	AUTH_TOKEN = os.environ.get('AUTH_TOKEN')
+	# Prefix for data inserted in OP_RETURN
+	DATA_PREFIX = 'VDICT '
+
+	FUND_WALLET_SECRET = os.environ.get('FUND_WALLET_SECRET').encode('utf-8')
+	FEDERATION_WALLET_SECRET = os.environ.get('FED_WALLET_SECRET').encode('utf-8')
+
+	if not AUTH_TOKEN or not FUND_WALLET_SECRET or not FEDERATION_WALLET_SECRET:
+		raise Exception("Bad config")
+
+
+	fund_wallet = Wallet(FUND_WALLET_SECRET)
+	fed_wallet = Wallet(FEDERATION_WALLET_SECRET)
+
+	print("Fund wallet: %s" % fund_wallet.root_address[1])
+	print("Federation wallet: %s" % fed_wallet.root_address[1])
+
+
+
 	app.run(host=ip, threaded=True)
 
 
